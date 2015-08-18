@@ -1,0 +1,78 @@
+#!/usr/bin/python
+
+'''
+Syncs clipboards of Midnight Commander and X Window System.
+
+Install:
+
+    sudo apt-get install xclip
+    sudo pip install mc_xclip
+
+    # If you use Display Manager:
+    echo 'mc_xclip &' >> .xprofile
+
+    # Else:
+    echo 'mc_xclip &' >> .xinitrc
+
+    # Reboot.
+
+mc_xclip version 0.2.0
+Copyright (C) 2011-2015 by Denis Ryzhkov <denisr@denisr.com>
+MIT License, see http://opensource.org/licenses/MIT
+'''
+
+### import
+
+from os import environ, path, stat
+from subprocess import Popen, PIPE
+from time import sleep
+
+### config
+
+mc_clip = path.join(environ['HOME'], '.local', 'share', 'mc', 'mcedit', 'mcedit.clip')
+xclip = ['xclip', '-selection', 'clipboard']
+xclip_out = xclip + ['-o']
+xclip_in = xclip + ['-i']
+reaction_in_seconds = 1
+
+### main
+
+def main():
+
+    text = last_text = last_mtime = None
+    while True:
+        try:
+            sleep(reaction_in_seconds)
+
+            ### x to mc
+
+            stdout, stderr = Popen(xclip_out, stdout=PIPE, stderr=PIPE).communicate()
+            if not stderr:
+                text = stdout
+
+            if last_text != text:
+                last_text = text
+
+                with open(mc_clip, 'w') as f:
+                    f.write(text)
+
+            ### mc to x
+
+            mtime = stat(mc_clip).st_mtime
+
+            if last_mtime != mtime:
+                last_mtime = mtime
+
+                with open(mc_clip, 'r') as f:
+                    text = f.read()
+
+                if last_text != text:
+                    last_text = text
+
+                    Popen(xclip_in, stdin=PIPE).communicate(text)
+
+        except Exception:
+            pass
+
+if __name__ == '__main__':
+    main()
